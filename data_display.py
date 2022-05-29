@@ -1,0 +1,1 @@
+plts_path = 'F:/SkillBot/data/plots'

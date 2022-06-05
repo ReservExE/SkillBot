@@ -59,15 +59,18 @@ async def help(update: Update, context: CallbackContext.DEFAULT_TYPE):
         '4) You can also use /cluster to request a new data cluster for better stats\n' 
         'The process of initializing a cluster may take some time, try looking fot the same vacancy in ~10 minutes\n',)
 
+
 async def search_logic(update: Update, context: CallbackContext.DEFAULT_TYPE):
     user = update.message.from_user
     text = update.message.text
     logger.info(f"User {user.first_name} started fetching process.")
     await update.message.reply_text(f'Fetching data on {text} ...')
+    user_request_object = ps.getSkillsFromPage(text=text, numpages=1)
+    user_request_object.visualize_skills()
+    #await update.message.reply_text(f'Data: \n'
+    #                                f'{user_request_object.result}')
 
-    user_request_result = ps.getSkillsFromPage(text=text, numpages=1)
-    await update.message.reply_text(f'Data: \n'
-                                    f'{user_request_result.result}')
+    await update.message.reply_photo(user_request_object.plot_path)
 
 
 async def quickRequest(update: Update, context: CallbackContext.DEFAULT_TYPE):
@@ -75,8 +78,6 @@ async def quickRequest(update: Update, context: CallbackContext.DEFAULT_TYPE):
                                     f"Please, specify the search text...")
 
     return AWAITING_TEXT_REPLY
-
-
 
 
 def echo(update: Update, context: CallbackContext):

@@ -2,6 +2,9 @@ import logging
 
 #On-demand parsing request and data display
 import parse_logic as ps
+import display_logic as dl
+import nlp_logic as nlp
+import cluster_handling_logic as chl
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -47,8 +50,8 @@ async def start(update: Update, context: CallbackContext):
     return MAIN_ROUTES
 
 
-async def skills(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="skills_logic_here")
+
+
 
 
 async def help(update: Update, context: CallbackContext.DEFAULT_TYPE):
@@ -60,29 +63,57 @@ async def help(update: Update, context: CallbackContext.DEFAULT_TYPE):
         'The process of initializing a cluster may take some time, try looking fot the same vacancy in ~10 minutes\n',)
 
 
-async def search_logic(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    user = update.message.from_user
-    text = update.message.text
-    logger.info(f"User {user.first_name} started fetching process.")
-    await update.message.reply_text(f'Fetching data on {text} ...')
-    user_request_object = ps.getSkillsFromPage(text=text, numpages=1)
-    user_request_object.visualize_skills()
-    #await update.message.reply_text(f'Data: \n'
-    #                                f'{user_request_object.result}')
-
-    await update.message.reply_photo(user_request_object.plot_path)
-
-
-async def quickRequest(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    await update.message.reply_text(f"Initializing a new search on headhunter.ru\n"
+async def ask_user_input(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    await update.message.reply_text(f"Okay, skills for what position are we looking for?\n"
                                     f"Please, specify the search text...")
 
     return AWAITING_TEXT_REPLY
 
 
-def echo(update: Update, context: CallbackContext):
-    context.bot.send_message(chat_id=update.effective_chat.id,
-                             text=update.message.text)
+async def general_search(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    user = update.message.from_user
+
+    text = update.message.text
+    logger.info(f"ID:[{user.id}] NAME:[{user.first_name} {user.last_name}]"
+                f" Initialized GENERAL search for [{text}].")
+
+    input_object = nlp.userInput(text)
+    input_object.process_input()
+    logger.info(f"ID:[{user.id}] NAME:[{user.first_name} {user.last_name}]"
+                f" tokenized [{text}] as [{input_object.text}].")
+
+
+
+
+async def hh_search(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    user = update.message.from_user
+    text = update.message.text
+
+    logger.info(f"ID:[{user.id}] NAME:[{user.first_name} {user.last_name}]"
+                f" Initialized HH search for [{text}].")
+
+    #Оповестить пользователя о начале поиска
+    await update.message.reply_text(f'Getting data on [{text}], please wait ...')
+    try:
+        user_request_object = ps.getSkillsFromPage(text=text, numpages=1)
+        plot = dl.visualize_skills(user_request_object.df_result)
+
+        #Выдать результат поиска
+        await update.message.reply_text(f'Here is what I found searching for [{text}] ...')
+        await update.message.reply_photo(open(plot,'rb'))
+        logger.info(f"ID:[{user.id}] NAME:[{user.first_name} {user.last_name}]"
+                    f" SUCCESS [{text}].")
+    except:
+        await update.message.reply_text(f'Whoops, something went wrong. Rolling back')
+        logger.info(f"ID:[{user.id}] NAME:[{user.first_name} {user.last_name}]"
+                    f" ERROR [{text}].")
+
+    #Вернуться на стадию Start
+    return MAIN_ROUTES
+
+
+
+
 
 
 def unknown(update: Update, context: CallbackContext):
@@ -97,15 +128,15 @@ def main() -> None:
         entry_points=[CommandHandler("start", start)],
         states={
             MAIN_ROUTES: [
-                MessageHandler(filters.Regex('^(Skills)$'), skills),
+                MessageHandler(filters.Regex('^(Skills)$'), ask_user_input),
                 MessageHandler(filters.Regex('^(Help)$'), help),
-                MessageHandler(filters.Regex('^(Browse headhunter.ru)$'), quickRequest)
+                MessageHandler(filters.Regex('^(Browse headhunter.ru)$'), ask_user_input)
 
             ],
             AWAITING_TEXT_REPLY: [
                 MessageHandler(
                     filters.TEXT & ~(filters.COMMAND),
-                    search_logic,
+                    general_search,
                 )
             ]
         },
